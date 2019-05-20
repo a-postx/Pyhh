@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <StartupObject></StartupObject>
+    <LangVersion>latest</LangVersion>
+    <ApplicationIcon />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="GetUserWallPosts.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="JS\GetUserWallPosts.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
+    <PackageReference Include="PuppeteerSharp" Version="1.13.0" />
+  </ItemGroup>
+
+</Project>
