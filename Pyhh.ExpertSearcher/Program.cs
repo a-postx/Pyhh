@@ -41,7 +41,7 @@ namespace Pyhh.ExpertSearcher
 
             if (id == 0)
             {
-                Console.WriteLine(DateTime.Now + " Error getting VK application ID, please supply a numerical value.");
+                Console.WriteLine(DateTime.Now + " Error getting VK application ID, please supply a numerical value of the application registered in VK.");
                 return;
             }
 
@@ -57,19 +57,22 @@ namespace Pyhh.ExpertSearcher
 
                 if (!string.IsNullOrEmpty(Groups))
                 {
-                    Console.WriteLine(DateTime.Now + " Gathering community data...");
+                    Console.WriteLine(DateTime.Now + " Collecting community data...");
                     List<VkApiUser> potentialExperts = await GetPotentialExpertsFromGroups(vkontakteApi, vkontakteBrw, Groups.Split(','));
                     Console.WriteLine(DateTime.Now + " Community data collected.");
                     Console.WriteLine(DateTime.Now + " Potential experts found: " + potentialExperts.Count);
 
-                    DataTable expertsTable = potentialExperts.ToDataTable(Groups);
-                    List<DataTable> reportData = new List<DataTable>();
-                    reportData.Add(expertsTable);
+                    if (potentialExperts.Count > 0)
+                    {
+                        DataTable expertsTable = potentialExperts.ToDataTable(Groups);
+                        List<DataTable> reportData = new List<DataTable>();
+                        reportData.Add(expertsTable);
 
-                    string exportPath = Path.GetDirectoryName(Environment.CurrentDirectory);
+                        string exportPath = Path.GetDirectoryName(Environment.CurrentDirectory);
 
-                    ExpertReport expertReport = new ExpertReport("ПотенциальныеЭксперты", exportPath, reportData);
-                    expertReport.ExportToExcel();
+                        ExpertReport expertReport = new ExpertReport("ПотенциальныеЭксперты", exportPath, reportData);
+                        expertReport.ExportToExcel();
+                    }                    
                 }
                 else if (!string.IsNullOrEmpty(Users))
                 {
@@ -99,13 +102,14 @@ namespace Pyhh.ExpertSearcher
                     return result;
                 }
 
+                Console.WriteLine(DateTime.Now + " Community: " + community.ScreenName + ". Members count: " + community.UserIds.Count);
+
                 //large are not tested
-                if (community.Users.Count > 100000)
+                if (community.Users.Count > 400000)
                 {
+                    Console.WriteLine(DateTime.Now + " Cannot get results for community " + group + ": too many members.");
                     return result;
                 }
-
-                Console.WriteLine(DateTime.Now + " " + community.ScreenName);
 
                 //create BrwCommunity
 
@@ -126,6 +130,9 @@ namespace Pyhh.ExpertSearcher
 
                     communityUsers.Add(vkBrwUser);
                 });
+
+                Console.WriteLine(DateTime.Now + " Community: " + community.ScreenName + ". Open members count: " + communityUsers.Count);
+                Console.WriteLine(DateTime.Now + " Getting wall posts from open members...");
 
                 List<VkBrwUserWallPost> wallPosts = await vkBrw.GetWallRecords(communityUsers);
 

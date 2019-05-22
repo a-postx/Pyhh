@@ -150,9 +150,13 @@ namespace Pyhh.VkApi
                     result = community;
                 }
             }
+            catch (ParameterMissingOrInvalidException)
+            {
+                Console.WriteLine("Error discovering community " + groupId + ": community not found.");
+            }
             catch (Exception e)
             {
-                Console.WriteLine("Error discovering group " + groupId + ": " + e);
+                Console.WriteLine("Error discovering community " + groupId + ": " + e);
             }
 
             return result;

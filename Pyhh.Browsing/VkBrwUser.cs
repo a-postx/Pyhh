@@ -133,7 +133,7 @@ namespace Pyhh.Browsing
 
             await GetVkUserBrowser();
 
-            NavigationOptions navOptions = new NavigationOptions { Timeout = 90000,
+            NavigationOptions navOptions = new NavigationOptions { Timeout = 120000,
                 WaitUntil = new WaitUntilNavigation[] { WaitUntilNavigation.Load, WaitUntilNavigation.Networkidle2 } };
             WaitForSelectorOptions selectorOptions = new WaitForSelectorOptions { Timeout = 30000 };
             //https://vk.com/wall238081?own=1
@@ -147,14 +147,20 @@ namespace Pyhh.Browsing
             catch (NavigationException e)
             {
                 Console.WriteLine("Error opening user page for user " + ProfileLink + ": " + e);
+                await ReleaseVkUserBrowser();
+                return result;
             }
             catch (InvalidOperationException e)
             {
                 Console.WriteLine("Error opening user page for user " + ProfileLink + ": " + e);
+                await ReleaseVkUserBrowser();
+                return result;
             }
             catch (Exception e)
             {
                 Console.WriteLine("Error opening user page for user " + ProfileLink + ": " + e);
+                await ReleaseVkUserBrowser();
+                return result;
             }
 
             if (userPageResponse?.Status != System.Net.HttpStatusCode.OK)
