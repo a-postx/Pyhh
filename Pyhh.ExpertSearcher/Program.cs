@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Pyhh.Browsing;
 using Pyhh.VkApi;
@@ -14,11 +15,14 @@ namespace Pyhh.ExpertSearcher
         internal static string VkAppId { private get; set; }
         internal static string VkUserApiKey { private get; set; }
         internal static string VkServiceApiKey { private get; set; }
+        internal static bool Mobile { private get; set; } = false;
         internal static string Groups { private get; set; }
         internal static string Users { private get; set; }
 
         static async Task Main(string[] args)
         {
+            Console.OutputEncoding = Encoding.UTF8;
+
             Action action = Arguments.ProcessCommandLine(args);
 
             switch (action)
@@ -48,7 +52,7 @@ namespace Pyhh.ExpertSearcher
             VkontakteApi vkontakteApi = new VkontakteApi(id, VkUserApiKey, VkServiceApiKey);
             await vkontakteApi.DiscoverAsync();
 
-            VkontakteBrw vkontakteBrw = new VkontakteBrw();
+            VkontakteBrw vkontakteBrw = new VkontakteBrw(Mobile);
             await vkontakteBrw.DiscoverAsync();
 
             if (vkontakteApi.DiscoveringCompleted.IsSet && vkontakteBrw.DiscoveringCompleted.IsSet)
@@ -61,6 +65,10 @@ namespace Pyhh.ExpertSearcher
                     List<VkApiUser> potentialExperts = await GetPotentialExpertsFromGroups(vkontakteApi, vkontakteBrw, Groups.Split(','));
                     Console.WriteLine(DateTime.Now + " Community data collected.");
                     Console.WriteLine(DateTime.Now + " Potential experts found: " + potentialExperts.Count);
+                    Console.WriteLine(DateTime.Now + " Collected profiles: " + vkontakteBrw.CollectedProfiles);
+                    Console.WriteLine(DateTime.Now + " Non-public profiles: " + vkontakteBrw.NonPublicProfiles);
+                    Console.WriteLine(DateTime.Now + " Non-existing profiles: " + vkontakteBrw.NonExistingProfiles);
+                    Console.WriteLine(DateTime.Now + " Empty wall profiles: " + vkontakteBrw.EmptyWallProfiles);
 
                     if (potentialExperts.Count > 0)
                     {
@@ -99,17 +107,18 @@ namespace Pyhh.ExpertSearcher
 
                 if (community == null)
                 {
+                    Console.WriteLine(DateTime.Now + " Cannot get community details for " + group + ".");
                     return result;
                 }
 
-                Console.WriteLine(DateTime.Now + " Community: " + community.ScreenName + ". Members count: " + community.UserIds.Count);
-
-                //large are not tested
-                if (community.Users.Count > 400000)
+                //huge are not tested
+                if (community.Users.Count > 500000)
                 {
                     Console.WriteLine(DateTime.Now + " Cannot get results for community " + group + ": too many members.");
                     return result;
                 }
+
+                Console.WriteLine(DateTime.Now + " Community: " + community.ScreenName + ". Members count: " + community.UserIds.Count);
 
                 //create BrwCommunity
 
@@ -135,9 +144,8 @@ namespace Pyhh.ExpertSearcher
                 Console.WriteLine(DateTime.Now + " Getting wall posts from open members...");
 
                 List<VkBrwUserWallPost> wallPosts = await vkBrw.GetWallRecords(communityUsers);
-
-                ////List<VkBrwUserWallPost> withDates = wallPosts.Where(p => p.Date != null).ToList();
-                ////List<VkBrwUserWallPost> withoutDates = wallPosts.Where(p => p.Date == null).ToList();
+                
+                int expectedRepostsPercent = Mobile ? 40 : 50;
 
                 foreach (VkBrwUser user in vkBrw.Users)
                 {
@@ -149,7 +157,7 @@ namespace Pyhh.ExpertSearcher
                         int ownPostsCount = recentWallPosts.Count(p => p.Repost == false);
                         int repostsPercent = (repostsCount * 100) / (repostsCount + ownPostsCount);
 
-                        if (ownPostsCount > recentMonths && repostsPercent < 50)
+                        if (ownPostsCount >= recentMonths && repostsPercent <= expectedRepostsPercent)
                         {
                             VkApiUser correspondingUser = community.Users.FirstOrDefault(u => u.Id == user.UserId);
 
@@ -193,6 +201,7 @@ namespace Pyhh.ExpertSearcher
             Console.WriteLine("  -VKSERVICEAPIKEY <key>   Сервисный АПИ-ключ Вконтакте.");
             Console.WriteLine("  -GROUPS <groupIds>       Список групп, разделённых запятыми (айди или названия), из которых необходимо получить информацию.");
             Console.WriteLine("  -GETPOTENTIALEXPERTS     Получить список потенциальных экспертов из указанных групп.");
+            Console.WriteLine("  -MOBILE                  Использовать мобильную версию ВК (результат быстрее, но он нестабилен).");
             Console.WriteLine(string.Empty);
             Console.WriteLine(Environment.NewLine);
         }

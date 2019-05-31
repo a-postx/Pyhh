@@ -49,7 +49,7 @@ namespace Pyhh.Browsing
 
             LaunchOptions browserOptions = new LaunchOptions
             {
-                Headless = true, Args = new string[] { "--lang=" + Vkontakte.BrowsingLanguage }
+                Headless = true, Args = new string[] { "--lang=" + Vkontakte.Language.ToString().ToLowerInvariant() }
             };
 
             Browser browser = await Puppeteer.LaunchAsync(browserOptions);
@@ -75,9 +75,9 @@ namespace Pyhh.Browsing
             await page.SetViewportAsync(new ViewPortOptions
             {
                 Width = 1024,
-                Height = 768
+                Height = 450
             });
-            await page.SetUserAgentAsync("Mozilla / 5.0(Windows NT 10.0; Win64; x64) AppleWebKit / 537.36(KHTML, like Gecko) Chrome / 74.0.3723.0 Safari / 537.36");
+            await page.SetUserAgentAsync(Vkontakte.UserAgent);
 
             return page;
         }
@@ -134,15 +134,22 @@ namespace Pyhh.Browsing
             await GetVkUserBrowser();
 
             NavigationOptions navOptions = new NavigationOptions { Timeout = 120000,
-                WaitUntil = new WaitUntilNavigation[] { WaitUntilNavigation.Load, WaitUntilNavigation.Networkidle2 } };
-            WaitForSelectorOptions selectorOptions = new WaitForSelectorOptions { Timeout = 30000 };
+                WaitUntil = new WaitUntilNavigation[] { WaitUntilNavigation.Load, WaitUntilNavigation.Networkidle0, WaitUntilNavigation.DOMContentLoaded } };
             //https://vk.com/wall238081?own=1
+            //https://m.vk.com/id238081?own=1#wall
 
-            Response userPageResponse = null;
+            Response userPageResponse;
 
             try
             {
-                userPageResponse = await _userPage.GoToAsync(Vkontakte.BaseUrl + "/wall" + UserId + "?own=1", navOptions);
+                if (Vkontakte.Mobile)
+                {
+                    userPageResponse = await _userPage.GoToAsync(Vkontakte.BaseUrl + "/id" + UserId + "?own=1#wall", navOptions);
+                }
+                else
+                {
+                    userPageResponse = await _userPage.GoToAsync(Vkontakte.BaseUrl + "/wall" + UserId + "?own=1", navOptions);
+                }
             }
             catch (NavigationException e)
             {
@@ -163,15 +170,241 @@ namespace Pyhh.Browsing
                 return result;
             }
 
-            if (userPageResponse?.Status != System.Net.HttpStatusCode.OK)
+            if (userPageResponse != null)
             {
-                Console.WriteLine("Cannot open wall records page for user " + ProfileLink + " status code: " + userPageResponse?.Status);
-                return result;
+                if (userPageResponse.Status != System.Net.HttpStatusCode.OK)
+                {
+                    Console.WriteLine("Cannot open wall records page for user " + ProfileLink + " status code: " + userPageResponse?.Status);
+                    return result;
+                }
+
+                if (Vkontakte.Mobile)
+                {
+                    result = await GetPostsViaMobilePuppeteer();
+                }
+                else
+                {
+                    result = await GetPostsViaDesktopPuppeteer();
+                }
+            }
+            else
+            {
+                Console.WriteLine("Response for page " + ProfileLink + " is empty.");
             }
 
-            string getUserWallPostsScript = Vkontakte.JsScripts.GetUserWallPosts;
+            await ReleaseVkUserBrowser();
 
-            // Total CPU [unit, %]: 645
+            return result;
+        }
+
+        private async Task<List<VkBrwUserWallPost>> GetPostsViaMobilePuppeteer()
+        {
+            List<VkBrwUserWallPost> result = new List<VkBrwUserWallPost>();
+            
+            string hiddenDescriptionLocalized = (Vkontakte.Language == BrowsingLanguage.RU) ?
+                "Страница доступна только авторизованным пользователям." :
+                "You have to log in to view this page.";
+            string emptyWallDescriptionLocalized = (Vkontakte.Language == BrowsingLanguage.RU) ?
+                "На стене пока нет ни одной записи." :
+                "This wall is empty.";
+
+            ElementHandle vkMessageElement = await _userPage.QuerySelectorAsync("div.service_msg.service_msg_null");
+
+            if (vkMessageElement != null)
+            {
+                //"Страница удалена либо ещё не создана."
+                //
+                string vkMessageText = await vkMessageElement.EvaluateFunctionAsync<string>("('div', div => div.innerText)");
+
+                if (vkMessageText == hiddenDescriptionLocalized)
+                {
+                    Vkontakte.NonPublicProfiles = Vkontakte.NonPublicProfiles + 1;
+                }
+                else if (vkMessageText == emptyWallDescriptionLocalized)
+                {
+                    Vkontakte.EmptyWallProfiles = Vkontakte.EmptyWallProfiles + 1;
+                }
+                else
+                {
+                    Vkontakte.NonExistingProfiles = Vkontakte.NonExistingProfiles + 1;
+                }
+            }
+            else
+            {
+                ElementHandle[] wallPostElements = await _userPage.QuerySelectorAllAsync("div.wall_item");
+
+                if (wallPostElements.Length > 0)
+                {
+                    foreach (ElementHandle postElement in wallPostElements)
+                    {
+                        VkBrwUserWallPost post = new VkBrwUserWallPost();
+
+                        ElementHandle dateElement = await postElement.QuerySelectorAsync("a.wi_date");
+
+                        if (dateElement != null)
+                        {
+                            string postDateRaw = await dateElement.EvaluateFunctionAsync<string>("('a', a => a.innerText)");
+
+                            DateTime postDate = Vkontakte.Language == BrowsingLanguage.RU
+                                ? ConvertVkWallPostRusDate(postDateRaw)
+                                : ConvertVkWallPostEngDate(postDateRaw);
+
+                            if (postDate != DateTime.MinValue)
+                            {
+                                post.Date = postDate;
+                            }
+                        }
+
+                        ElementHandle wallPostTextElement = await postElement.QuerySelectorAsync("div.pi_text");
+
+                        if (wallPostTextElement != null)
+                        {
+                            post.Text = await wallPostTextElement.EvaluateFunctionAsync<string>("'span', span => span.innerText");
+                        }
+
+                        string repostValue = await postElement.EvaluateFunctionAsync<string>("('div', div => { return div.getAttribute('data-copy'); })");
+                        post.Repost = !string.IsNullOrEmpty(repostValue);
+
+                        result.Add(post);
+
+                        post.User = this;
+                        WallPosts.Add(post);
+                    }
+
+                    Vkontakte.CollectedProfiles = Vkontakte.CollectedProfiles + 1;
+                }
+                else
+                {
+                    Vkontakte.NonPublicProfiles = Vkontakte.NonPublicProfiles + 1;
+                }
+            }
+
+            return result;
+        }
+
+        // Total CPU [unit, %]: 676
+        private async Task<List<VkBrwUserWallPost>> GetPostsViaDesktopPuppeteer()
+        {
+            List<VkBrwUserWallPost> result = new List<VkBrwUserWallPost>();
+
+            string vkMessageHeaderInformationLocalized = (Vkontakte.Language == BrowsingLanguage.RU) ?
+                "Информация" :
+                "Information";
+            string vkMessageHeaderErrorLocalized = (Vkontakte.Language == BrowsingLanguage.RU) ?
+                "Ошибка" :
+                "Error";
+            string hiddenDescriptionLocalized = (Vkontakte.Language == BrowsingLanguage.RU) ?
+                "Пользователь предпочёл скрыть эту страницу." :
+                "This user has chosen to hide their page.";
+
+            ElementHandle vkMessageElement = await _userPage.QuerySelectorAsync("div.message_page.page_block");
+
+            if (vkMessageElement != null)
+            {
+                ElementHandle vkMessageHeaderElement = await vkMessageElement.QuerySelectorAsync("div.message_page_title");
+
+                if (vkMessageHeaderElement != null)
+                {
+                    string vkMessageHeaderText = await vkMessageHeaderElement.EvaluateFunctionAsync<string>("('div', div => div.innerText)");
+
+                    if (vkMessageHeaderText == vkMessageHeaderInformationLocalized)
+                    {
+                        Vkontakte.NonExistingProfiles = Vkontakte.NonExistingProfiles + 1;
+                    }
+                    else if (vkMessageHeaderText == vkMessageHeaderErrorLocalized)
+                    {
+                        ElementHandle vkMessageBodyElement = await vkMessageElement.QuerySelectorAsync("div.message_page_body");
+
+                        if (vkMessageBodyElement != null)
+                        {
+                            string vkMessageBodyText = await vkMessageBodyElement.EvaluateFunctionAsync<string>("('div', div => div.innerText)");
+                            string vkMessageBodyDescription = vkMessageBodyText.Split('\n')[0];
+
+                            if (vkMessageBodyDescription == hiddenDescriptionLocalized)
+                            {
+                                HiddenProfile = true;
+                                Vkontakte.NonPublicProfiles = Vkontakte.NonPublicProfiles + 1;
+                            }
+                            else// if (mmm == "Вы попытались загрузить более одной однотипной страницы в секунду.")
+                            {
+                                Console.WriteLine(ProfileLink + " has the following vk message: " + vkMessageBodyDescription);
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine(ProfileLink + " doesn't contain vk message body.");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine(ProfileLink + " error header text is " + vkMessageHeaderText);
+                    }
+                }
+            }
+            else
+            {
+                ElementHandle[] wallPostElements = await _userPage.QuerySelectorAllAsync("div._post_content");
+
+                if (wallPostElements != null && wallPostElements.Length > 0)
+                {
+                    foreach (ElementHandle postElement in wallPostElements)
+                    {
+                        VkBrwUserWallPost post = new VkBrwUserWallPost();
+
+                        ElementHandle dateElement = await postElement.QuerySelectorAsync("span.rel_date");
+
+                        if (dateElement != null)
+                        {
+                            string postDateRaw = await dateElement.EvaluateFunctionAsync<string>("('span', span => span.innerText)");
+
+                            DateTime postDate = Vkontakte.Language == BrowsingLanguage.RU
+                            ? ConvertVkWallPostRusDate(postDateRaw)
+                            : ConvertVkWallPostEngDate(postDateRaw);
+
+                            if (postDate != DateTime.MinValue)
+                            {
+                                post.Date = postDate;
+                            }
+                        }
+
+                        ElementHandle wallPostTextElement = await postElement.QuerySelectorAsync("div.wall_text");
+
+                        if (wallPostTextElement != null)
+                        {
+                            post.Repost = (await wallPostTextElement.QuerySelectorAsync("div.copy_quote") != null);
+
+                            ElementHandle postT = await wallPostTextElement.QuerySelectorAsync("div.wall_post_text");
+
+                            if (postT != null)
+                            {
+                                post.Text = await postT.EvaluateFunctionAsync<string>("'div', div => div.innerText");
+                            }
+                        }
+
+                        result.Add(post);
+
+                        post.User = this;
+                        WallPosts.Add(post);
+                    }
+
+                    Vkontakte.CollectedProfiles = Vkontakte.CollectedProfiles + 1;
+                }
+                else
+                {
+                    Vkontakte.EmptyWallProfiles = Vkontakte.EmptyWallProfiles + 1;
+                }
+            }
+
+            return result;
+        }
+
+        // Total CPU [unit, %]: 645
+        private async Task<List<VkBrwUserWallPost>> GetPostsViaDesktopJS()
+        {
+            List<VkBrwUserWallPost> result = new List<VkBrwUserWallPost>();
+
+            string getUserWallPostsScript = Vkontakte.JsScripts.GetUserWallPosts;
+            
             var wallPostsResult = await _userPage.EvaluateFunctionAsync<List<VkBrwUserJsWallPost>>("() => {" + getUserWallPostsScript + "}");
 
             if (wallPostsResult != null)
@@ -182,7 +415,7 @@ namespace Pyhh.Browsing
                     {
                         VkBrwUserWallPost post = new VkBrwUserWallPost
                         {
-                            Date = Vkontakte.BrowsingLanguage == "ru"
+                            Date = Vkontakte.Language == BrowsingLanguage.RU
                                 ? ConvertVkWallPostRusDate(jsPost.Date)
                                 : ConvertVkWallPostEngDate(jsPost.Date),
                             Repost = jsPost.Repost,
@@ -195,57 +428,6 @@ namespace Pyhh.Browsing
                     });
                 }
             }
-
-            // Total CPU [unit, %]: 676
-            ////ElementHandle wallSection = await _userPage.QuerySelectorAsync("#page_wall_posts.page_wall_posts.mark_top");
-
-            ////if (wallSection != null)
-            ////{
-            ////    ElementHandle[] wallPostElements = await wallSection.QuerySelectorAllAsync("div._post_content");
-
-            ////    if (wallPostElements != null && wallPostElements.Length > 0)
-            ////    {
-            ////        foreach (ElementHandle postElement in wallPostElements)
-            ////        {
-            ////            VkBrwUserWallPost post = new VkBrwUserWallPost();
-
-            ////            ElementHandle dateElement = await postElement.QuerySelectorAsync("span.rel_date");
-
-            ////            if (dateElement != null)
-            ////            {
-            ////                string postDateRaw = await dateElement.EvaluateFunctionAsync<string>("('span', span => span.innerText)");
-
-            ////                DateTime newDate = ConvertVkWallPostRusDate(postDateRaw);
-
-            ////                if (newDate != DateTime.MinValue)
-            ////                {
-            ////                    post.Date = newDate;
-            ////                }
-            ////            }
-
-            ////            ElementHandle wallPostTextElement = await postElement.QuerySelectorAsync("div.wall_text");
-
-            ////            if (wallPostTextElement != null)
-            ////            {
-            ////                post.Repost = (await wallPostTextElement.QuerySelectorAsync("div.copy_quote") != null);
-
-            ////                ElementHandle postT = await wallPostTextElement.QuerySelectorAsync("div.wall_post_text");
-
-            ////                if (postT != null)
-            ////                {
-            ////                    post.Text = await postT.EvaluateFunctionAsync<string>("'div', div => div.innerText");
-            ////                }
-            ////            }
-
-            ////            result.Add(post);
-
-            ////            post.User = this;
-            ////            WallPosts.Add(post);
-            ////        }
-            ////    }
-            ////}
-
-            await ReleaseVkUserBrowser();
 
             return result;
         }

@@ -57,6 +57,10 @@ namespace Pyhh.ExpertSearcher
                             result = Action.GetPotentialExperts;
                             break;
 
+                        case "MOBILE":
+                            Program.Mobile = true;
+                            break;
+
                         case "HELP":
                         case "?":
                         default:

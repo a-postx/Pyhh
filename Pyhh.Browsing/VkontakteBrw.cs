@@ -8,18 +8,42 @@ using PuppeteerSharp.Input;
 
 namespace Pyhh.Browsing
 {
+    public enum BrowsingLanguage
+    {
+        UN = 0,
+        RU = 1,
+        EN = 2
+    }
+
     public class VkontakteBrw
     {
-        public VkontakteBrw()
+        public VkontakteBrw(bool mobile)
         {
-            BaseUrl = "https://vk.com";
+            Mobile = mobile;
+            BaseUrl = mobile ? "https://m.vk.com" : "https://vk.com";
+            UserAgent = Mobile ?
+                "Mozilla / 5.0(Linux; Android 4.2.1; en - us; Nexus 5 Build / JOP40D) AppleWebKit / 535.19(KHTML, like Gecko; googleweblight) Chrome / 38.0.1025.166 Mobile Safari/ 535.19" :
+                "Mozilla / 5.0(Windows NT 10.0; Win64; x64) AppleWebKit / 537.36(KHTML, like Gecko) Chrome / 74.0.3723.0 Safari / 537.36";
+
+            DefaultNavigationOptions = new NavigationOptions { Timeout = 30000 };
+            DefaultWaitForSelectorOptions = new WaitForSelectorOptions { Timeout = 10000 };
+            DefaultClickOptions = new ClickOptions { Delay = new Random().Next(100, 200) };
         }
 
         public List<VkBrwUser> Users { get; set; } = new List<VkBrwUser>();
         public List<VkBrwCommunity> Communities { get; set; } = new List<VkBrwCommunity>();
+        public bool Mobile { get; set; }
+        public string UserAgent { get; set; }
         public string BaseUrl { get; set; }
+        public NavigationOptions DefaultNavigationOptions { get; set; }
+        public WaitForSelectorOptions DefaultWaitForSelectorOptions { get; set; }
+        public ClickOptions DefaultClickOptions { get; set; }
         internal Countries CurrentCountry { get; set; }
-        internal string BrowsingLanguage { get; set; }
+        internal BrowsingLanguage Language { get; set; }
+        public int CollectedProfiles { get; set; }
+        public int NonPublicProfiles { get; set; }
+        public int NonExistingProfiles { get; set; }
+        public int EmptyWallProfiles { get; set; }
 
         public ManualResetEventSlim DiscoveringCompleted { get; } = new ManualResetEventSlim(false);
 
@@ -36,22 +60,22 @@ namespace Pyhh.Browsing
             Countries country = await geoDetector.GetCountryAsync();
             CurrentCountry = (country != Countries.UN) ? country : Countries.UN;
 
-            switch (CurrentCountry.ToString().ToLowerInvariant())
+            switch (CurrentCountry)
             {
-                case "ru":
-                    BrowsingLanguage = "ru";
+                case Countries.RU:
+                    Language = BrowsingLanguage.RU;
                     break;
-                case "cn":
-                case "us":
-                case "de":
-                case "fr":
-                case "ie":
-                case "gb":
-                case "sg":
-                    BrowsingLanguage = "en";
+                case Countries.CN:
+                case Countries.US:
+                case Countries.DE:
+                case Countries.FR:
+                case Countries.IE:
+                case Countries.GB:
+                case Countries.SG:
+                    Language = BrowsingLanguage.EN;
                     break;
                 default:
-                    BrowsingLanguage = "ru";
+                    Language = BrowsingLanguage.RU;
                     break;
             }
 
@@ -59,7 +83,7 @@ namespace Pyhh.Browsing
 
             LaunchOptions browserOptions = new LaunchOptions
             {
-                Headless = true, Args = new string[] {"--lang=" + BrowsingLanguage}
+                Headless = true, Args = new string[] {"--lang=" + Language.ToString().ToLowerInvariant()}
             };
 
             Browser browser = await Puppeteer.LaunchAsync(browserOptions);
@@ -70,27 +94,16 @@ namespace Pyhh.Browsing
             {
                 Width = 1024,
                 Height = 768
-            });
-            string ver = await browser.GetVersionAsync();
-            string userAgent = await browser.GetUserAgentAsync();
-            await page.SetUserAgentAsync("Mozilla / 5.0(Windows NT 10.0; Win64; x64) AppleWebKit / 537.36(KHTML, like Gecko) Chrome / 74.0.3723.0 Safari / 537.36");
+            });            
+            await page.SetUserAgentAsync(UserAgent);
 
-            NavigationOptions navOptions = new NavigationOptions { Timeout = 30000 };
-            WaitForSelectorOptions selectorOptions = new WaitForSelectorOptions { Timeout = 10000 };
-            ClickOptions clickOptions = new ClickOptions { Delay = new Random().Next(100, 200) };
-
-            await page.GoToAsync(BaseUrl, navOptions);
-            ElementHandle allProductsButton = await page.WaitForSelectorAsync("a.login_all_products_button", selectorOptions);
-
-            if (allProductsButton != null)
+            if (Mobile)
             {
-                await allProductsButton.ClickAsync(clickOptions);
-                ElementHandle topMenuElements = await page.WaitForSelectorAsync("ul.ui_tabs.clear_fix.blog_about_tabs.page_header_wrap", selectorOptions);
-
-                if (topMenuElements != null)
-                {
-                    DiscoveringCompleted.Set();
-                }
+                await DiscoverServiceMobile(page);
+            }
+            else
+            {
+                await DiscoverServiceDesktop(page);
             }
 
             if (!page.IsClosed)
@@ -103,6 +116,41 @@ namespace Pyhh.Browsing
             if (!browser.IsClosed)
             {
                 await browser.CloseAsync();
+            }
+        }
+
+        private async Task DiscoverServiceMobile(Page page)
+        {
+            await page.GoToAsync(BaseUrl, DefaultNavigationOptions);
+            ElementHandle forgetPasswordButton = await page.WaitForSelectorAsync("div.near_btn.wide_button.login_restore", DefaultWaitForSelectorOptions);
+
+            if (forgetPasswordButton != null)
+            {
+                await forgetPasswordButton.ClickAsync(DefaultClickOptions);
+                ElementHandle restoreElements = await page.WaitForSelectorAsync("div.PanelHeader__container", DefaultWaitForSelectorOptions);
+
+                if (restoreElements != null)
+                {
+                    DiscoveringCompleted.Set();
+                }
+            }
+
+        }
+
+        private async Task DiscoverServiceDesktop(Page page)
+        {
+            await page.GoToAsync(BaseUrl, DefaultNavigationOptions);
+            ElementHandle allProductsButton = await page.WaitForSelectorAsync("a.login_all_products_button", DefaultWaitForSelectorOptions);
+
+            if (allProductsButton != null)
+            {
+                await allProductsButton.ClickAsync(DefaultClickOptions);
+                ElementHandle topMenuElements = await page.WaitForSelectorAsync("ul.ui_tabs.clear_fix.blog_about_tabs.page_header_wrap", DefaultWaitForSelectorOptions);
+
+                if (topMenuElements != null)
+                {
+                    DiscoveringCompleted.Set();
+                }
             }
         }
 
