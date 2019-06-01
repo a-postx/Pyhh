@@ -140,7 +140,7 @@ namespace Pyhh.VkApi
                         break;
                     }
                     
-                    await Task.Delay(new TimeSpan(1, 0, 0));
+                    await Task.Delay(new TimeSpan(0,1,0));
 
                     retryCounter = retryCounter + 1;
                 }

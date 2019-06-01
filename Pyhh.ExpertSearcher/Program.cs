@@ -101,6 +101,24 @@ namespace Pyhh.ExpertSearcher
 
             int recentMonths = 3;
 
+            bool tr = false;
+            while(!tr)
+            {
+                foreach (string group in groups)
+                {
+                    VkApiCommunity community = await vkApi.GetCommunity(group);
+
+                    if (community == null)
+                    {
+                        Console.WriteLine(DateTime.Now + " Cannot get community details for " + group + ".");
+                    }
+                    else
+                    {
+                        Console.WriteLine(DateTime.Now + " Members for group " + group + " collected.");
+                    }
+                }
+            }
+
             foreach (string group in groups)
             {
                 VkApiCommunity community = await vkApi.GetCommunity(group);

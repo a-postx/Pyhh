@@ -36,35 +36,11 @@ namespace Pyhh.Browsing
 
             if (data != null)
             {
-                switch (data.CountryCode)
+                bool success = Enum.TryParse(data.CountryCode, out Countries parseResult);
+
+                if (success)
                 {
-                    case "RU":
-                        result = Countries.RU;
-                        break;
-                    case "CN":
-                        result = Countries.CN;
-                        break;
-                    case "US":
-                        result = Countries.US;
-                        break;
-                    case "DE":
-                        result = Countries.DE;
-                        break;
-                    case "FR":
-                        result = Countries.FR;
-                        break;
-                    case "IE":
-                        result = Countries.IE;
-                        break;
-                    case "GB":
-                        result = Countries.GB;
-                        break;
-                    case "SG":
-                        result = Countries.SG;
-                        break;
-                    default:
-                        result = Countries.UN;
-                        break;
+                    result = parseResult;
                 }
             }
 
@@ -77,7 +53,7 @@ namespace Pyhh.Browsing
 
             try
             {
-                using (HttpClient client = Utils.GetHttpClient("Test.Browsing/1.0 (2412719@mail.ru)", 60))
+                using (HttpClient client = Utils.GetHttpClient("Pyhh.Browsing/1.0 (2412719@mail.ru)", 60))
                 {
                     client.BaseAddress = new Uri(ProviderUrl);
                     HttpResponseMessage response = await client.GetAsync("/json");
@@ -93,13 +69,13 @@ namespace Pyhh.Browsing
                     }
                     else
                     {
-                        Console.WriteLine("Error getting region data, request status code is " + response.StatusCode);
+                        Console.WriteLine("Error getting geodata, request status code is " + response.StatusCode);
                     }
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine("Error getting geo data: " + e);
+                Console.WriteLine("Error getting geodata: " + e);
             }
 
             return result;
