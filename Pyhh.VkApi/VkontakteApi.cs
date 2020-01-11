@@ -129,7 +129,7 @@ namespace Pyhh.VkApi
             return result;
         }
 
-        public async Task<VkApiCommunity> DiscoverCommunity(string groupId)
+        public async Task<VkApiCommunity> DiscoverCommunityAsync(string groupId)
         {
             VkApiCommunity result = null;
 
@@ -168,7 +168,7 @@ namespace Pyhh.VkApi
 
             foreach (string id in communityIds)
             {
-                VkApiCommunity community = await DiscoverCommunity(id);
+                VkApiCommunity community = await DiscoverCommunityAsync(id);
 
                 if (community != null)
                 {
@@ -189,7 +189,7 @@ namespace Pyhh.VkApi
 
             ProfileFields profileFields = ProfileFields.FirstName | ProfileFields.LastName | ProfileFields.Sex
                                           | ProfileFields.ScreenName | ProfileFields.PhotoMaxOrig | ProfileFields.Career
-                                          | ProfileFields.FollowersCount;
+                                          | ProfileFields.FollowersCount | ProfileFields.LastSeen;
 
             foreach (List<long> batch in idBatches)
             {
@@ -348,11 +348,11 @@ namespace Pyhh.VkApi
             return result;
         }
 
-        public async Task<VkApiCommunity> GetCommunity(string commId)
+        public async Task<VkApiCommunity> GetCommunityAsync(string commId)
         {
             VkApiCommunity result = null;
 
-            VkApiCommunity community = await DiscoverCommunity(commId);
+            VkApiCommunity community = await DiscoverCommunityAsync(commId);
 
             if (community != null)
             {

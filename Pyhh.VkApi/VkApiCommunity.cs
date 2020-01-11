@@ -38,6 +38,68 @@ namespace Pyhh.VkApi
             await GetMemberDetailsAsync();
         }
 
+        public async Task<List<long>> GetMemberIdsAsync()
+        {
+            List<long> result = new List<long>();
+
+            var groupId = Group.Id;
+
+            long offset = 0;
+            bool membersIdsFinished = false;
+            long maxCommunityMembersBatch = Options.VkMaxExecuteApiCallResults;
+            int retryCounter = 0;
+            int maxRetries = 2;
+
+            while (!membersIdsFinished)
+            {
+                List<long> membersBatch = null;
+
+                try
+                {
+                    VkParameters parameters = new VkParameters { { "community", groupId }, { "offset", offset } };
+
+                    membersBatch = await Vk.UserApi.Execute.StoredProcedureAsync<List<long>>("GetCommunityUserIds", parameters);
+                }
+                catch (JsonSerializationException e)
+                {
+                    Console.WriteLine("Error deserializing user ids for community " + groupId + ": " + e);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Error getting user ids for community " + groupId + ": " + e);
+                }
+
+                if (membersBatch != null)
+                {
+                    if (membersBatch.Count > 0)
+                    {
+                        result.AddRange(membersBatch);
+                        offset = result.Count;
+                    }
+
+                    if (membersBatch.Count < maxCommunityMembersBatch)
+                    {
+                        membersIdsFinished = true;
+                    }
+                }
+                else
+                {
+                    if (retryCounter == maxRetries)
+                    {
+                        break;
+                    }
+
+                    await Task.Delay(new TimeSpan(0, 1, 0));
+
+                    retryCounter += 1;
+                }
+            }
+
+            UserIds = result;
+
+            return result;
+        }
+
         private async Task<List<VkApiUser>> GetMemberDetailsAsync()
         {
             List<VkApiUser> result = new List<VkApiUser>();
@@ -85,68 +147,6 @@ namespace Pyhh.VkApi
                     }
                 }
             }
-
-            return result;
-        }
-
-        public async Task<List<long>> GetMemberIdsAsync()
-        {
-            List<long> result = new List<long>();
-
-            var groupId = Group.Id;
-
-            long offset = 0;
-            bool membersIdsFinished = false;
-            long maxCommunityMembersBatch = Options.VkMaxExecuteApiCallResults;
-            int retryCounter = 0;
-            int maxRetries = 2;
-
-            while (!membersIdsFinished)
-            {
-                List<long> membersBatch = null;
-
-                try
-                {
-                    VkParameters parameters = new VkParameters {{"community", groupId}, {"offset", offset}};
-
-                    membersBatch = await Vk.UserApi.Execute.StoredProcedureAsync<List<long>>("GetCommunityUserIds", parameters);
-                }
-                catch (JsonSerializationException e)
-                {
-                    Console.WriteLine("Error deserializing user ids for community " + groupId + ": " + e);
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine("Error getting user ids for community " + groupId + ": " + e);
-                }
-
-                if (membersBatch != null)
-                {
-                    if (membersBatch.Count > 0)
-                    {
-                        result.AddRange(membersBatch);
-                        offset = result.Count;
-                    }
-
-                    if (membersBatch.Count < maxCommunityMembersBatch)
-                    {
-                        membersIdsFinished = true;
-                    }
-                }
-                else
-                {
-                    if (retryCounter == maxRetries)
-                    {
-                        break;
-                    }
-                    
-                    await Task.Delay(new TimeSpan(0,1,0));
-
-                    retryCounter = retryCounter + 1;
-                }
-            }
-
-            UserIds = result;
 
             return result;
         }

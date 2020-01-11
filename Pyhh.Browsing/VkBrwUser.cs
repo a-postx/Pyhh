@@ -218,15 +218,15 @@ namespace Pyhh.Browsing
 
                 if (vkMessageText == hiddenDescriptionLocalized)
                 {
-                    Vkontakte.NonPublicProfiles = Vkontakte.NonPublicProfiles + 1;
+                    Vkontakte.NonPublicProfiles += 1;
                 }
                 else if (vkMessageText == emptyWallDescriptionLocalized)
                 {
-                    Vkontakte.EmptyWallProfiles = Vkontakte.EmptyWallProfiles + 1;
+                    Vkontakte.EmptyWallProfiles += 1;
                 }
                 else
                 {
-                    Vkontakte.NonExistingProfiles = Vkontakte.NonExistingProfiles + 1;
+                    Vkontakte.NonExistingProfiles += 1;
                 }
             }
             else
@@ -271,11 +271,11 @@ namespace Pyhh.Browsing
                         WallPosts.Add(post);
                     }
 
-                    Vkontakte.CollectedProfiles = Vkontakte.CollectedProfiles + 1;
+                    Vkontakte.CollectedProfiles += 1;
                 }
                 else
                 {
-                    Vkontakte.NonPublicProfiles = Vkontakte.NonPublicProfiles + 1;
+                    Vkontakte.NonPublicProfiles += 1;
                 }
             }
 
@@ -309,7 +309,7 @@ namespace Pyhh.Browsing
 
                     if (vkMessageHeaderText == vkMessageHeaderInformationLocalized)
                     {
-                        Vkontakte.NonExistingProfiles = Vkontakte.NonExistingProfiles + 1;
+                        Vkontakte.NonExistingProfiles += 1;
                     }
                     else if (vkMessageHeaderText == vkMessageHeaderErrorLocalized)
                     {
@@ -323,7 +323,7 @@ namespace Pyhh.Browsing
                             if (vkMessageBodyDescription == hiddenDescriptionLocalized)
                             {
                                 HiddenProfile = true;
-                                Vkontakte.NonPublicProfiles = Vkontakte.NonPublicProfiles + 1;
+                                Vkontakte.NonPublicProfiles += 1;
                             }
                             else// if (mmm == "Вы попытались загрузить более одной однотипной страницы в секунду.")
                             {
@@ -387,11 +387,11 @@ namespace Pyhh.Browsing
                         WallPosts.Add(post);
                     }
 
-                    Vkontakte.CollectedProfiles = Vkontakte.CollectedProfiles + 1;
+                    Vkontakte.CollectedProfiles += 1;
                 }
                 else
                 {
-                    Vkontakte.EmptyWallProfiles = Vkontakte.EmptyWallProfiles + 1;
+                    Vkontakte.EmptyWallProfiles += 1;
                 }
             }
 

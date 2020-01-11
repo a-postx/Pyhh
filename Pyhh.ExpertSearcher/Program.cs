@@ -28,7 +28,7 @@ namespace Pyhh.ExpertSearcher
             switch (action)
             {
                 case Action.GetPotentialExperts:
-                    await GetExperts();
+                    await GetExpertsAsync();
                     break;
                 case Action.Help:
                 default:
@@ -37,7 +37,7 @@ namespace Pyhh.ExpertSearcher
             }
         }
 
-        private static async Task GetExperts()
+        private static async Task GetExpertsAsync()
         {
             Console.WriteLine(DateTime.Now + " Discovering...");
 
@@ -101,27 +101,27 @@ namespace Pyhh.ExpertSearcher
 
             int recentMonths = 3;
 
-            bool tr = false;
-            while(!tr)
-            {
-                foreach (string group in groups)
-                {
-                    VkApiCommunity community = await vkApi.GetCommunity(group);
+            ////bool tr = false;
+            ////while(!tr)
+            ////{
+            ////    foreach (string group in groups)
+            ////    {
+            ////        VkApiCommunity community = await vkApi.GetCommunity(group);
 
-                    if (community == null)
-                    {
-                        Console.WriteLine(DateTime.Now + " Cannot get community details for " + group + ".");
-                    }
-                    else
-                    {
-                        Console.WriteLine(DateTime.Now + " Members for group " + group + " collected.");
-                    }
-                }
-            }
+            ////        if (community == null)
+            ////        {
+            ////            Console.WriteLine(DateTime.Now + " Cannot get community details for " + group + ".");
+            ////        }
+            ////        else
+            ////        {
+            ////            Console.WriteLine(DateTime.Now + " Members for group " + group + " collected.");
+            ////        }
+            ////    }
+            ////}
 
             foreach (string group in groups)
             {
-                VkApiCommunity community = await vkApi.GetCommunity(group);
+                VkApiCommunity community = await vkApi.GetCommunityAsync(group);
 
                 if (community == null)
                 {
@@ -188,7 +188,7 @@ namespace Pyhh.ExpertSearcher
                                 if (!string.IsNullOrEmpty(correspondingUser.WorkingPlaceGroupId))
                                 {
                                     string commId = correspondingUser.WorkingPlaceGroupId.Split("/").Last();
-                                    VkApiCommunity commDetails = await vkApi.DiscoverCommunity(commId);
+                                    VkApiCommunity commDetails = await vkApi.DiscoverCommunityAsync(commId);
 
                                     if (commDetails != null)
                                     {

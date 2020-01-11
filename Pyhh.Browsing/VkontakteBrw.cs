@@ -57,8 +57,7 @@ namespace Pyhh.Browsing
         private async Task DiscoverSystemAsync()
         {
             GeoDetector geoDetector = new GeoDetector();
-            Countries country = await geoDetector.GetCountryAsync();
-            CurrentCountry = (country != Countries.UN) ? country : Countries.UN;
+            CurrentCountry = await geoDetector.GetCountryAsync();
 
             switch (CurrentCountry)
             {
@@ -145,7 +144,7 @@ namespace Pyhh.Browsing
             if (allProductsButton != null)
             {
                 await allProductsButton.ClickAsync(DefaultClickOptions);
-                ElementHandle topMenuElements = await page.WaitForSelectorAsync("ul.ui_tabs.clear_fix.blog_about_tabs.page_header_wrap", DefaultWaitForSelectorOptions);
+                ElementHandle topMenuElements = await page.WaitForSelectorAsync("ul.ui_tabs.clear_fix", DefaultWaitForSelectorOptions);
 
                 if (topMenuElements != null)
                 {
@@ -192,15 +191,15 @@ namespace Pyhh.Browsing
                 int usersInBatch = usersCount / maxParallelism;
 
                 IEnumerable<List<VkBrwUser>> userBatches = users.SplitList(usersInBatch);
-
+                var cts = new CancellationTokenSource();
                 List<Task<List<VkBrwUserWallPost>>> postTasks = userBatches.Select(GetUserWallRecords).ToList();
-                await Task.WhenAll(postTasks);
+                await Task.WhenAll(postTasks).ConfigureAwait(false);
 
                 foreach (Task<List<VkBrwUserWallPost>> task in postTasks.Where(t => t.IsCompleted && t.Result != null))
                 {
                     result.AddRange(task.Result);
                 }
-            }            
+            }
 
             return result;
         }
